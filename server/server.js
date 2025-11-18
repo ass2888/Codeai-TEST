@@ -3,8 +3,8 @@ import fetch from 'node-fetch';
 import cors from 'cors';
 import bodyParser from 'body-parser';
 import path from 'path';
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';      
+import { fileURLToPath } from 'url'; // <== يجب إضافة هذا
+import { dirname } from 'path';      // <== يجب إضافة هذا
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -20,62 +20,68 @@ app.use(express.static(path.join(__dirname, '..', 'client')));
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'client', 'index.html'));
 });
-
 app.post('/api/chat', async (req, res) => {
   const { message, convId, code } = req.body;
   broadcast({ type: 'assistant_message', text: 'Processing...' });
 
-  const OPENAI_KEY = process.env.OPENAI_API_KEY;
-  if(!OPENAI_KEY){
-    setTimeout(()=> broadcast({ type:'assistant_message', text:'No OPENAI_API_KEY set on server.'}), 400);
+  const GEMINI_KEY = process.env.GEMINI_API_KEY;
+  if(!GEMINI_KEY){ // ✅ التحقق من GEMINI_KEY
+    setTimeout(()=> broadcast({ type:'assistant_message', text:'No GEMINI_API_KEY set on server.'}), 400);
     return res.json({ status: 'no-key' });
   }
-
+  
   try{
-    const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+    // ✅ تصحيح بنية نداء fetch واستخدام رابط البث الصحيح
+    const resp = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?key=' + GEMINI_KEY, {
       method: 'POST',
       headers: {
-        Authorization: 'Bearer ' + OPENAI_KEY,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [{ role: 'user', content: message + "\n\nCurrent code:\n" + (code||'') }],
-        max_tokens: 800,
-        temperature: 0.2,
-        stream: true
+        contents: [{ role: 'user', parts: [{ text: message + "\n\nCurrent code:\n" + (code||'') }] }],
+        config: {
+          maxOutputTokens: 800,
+          temperature: 0.2
+        }
       })
     });
-
+      
     if(!resp.ok){
       const txt = await resp.text();
-      broadcast({ type:'assistant_message', text: 'OpenAI error: ' + txt.substring(0,200) });
-      return res.json({ status:'openai-error' });
+      // ✅ تصحيح رسالة الخطأ
+      broadcast({ type:'assistant_message', text: 'Gemini error: ' + txt.substring(0,200) });
+      return res.json({ status:'gemini-error' });
     }
 
     const reader = resp.body.getReader();
     const decoder = new TextDecoder('utf-8');
     let buffer = '';
+    
+    // ✅ منطق معالجة تدفق Gemini
     while(true){
       const { done, value } = await reader.read();
-      if(done) break;
       buffer += decoder.decode(value, { stream: true });
-      const parts = buffer.split('\n\n');
-      buffer = parts.pop();
-      for(const part of parts){
-        if(part.startsWith('data: ')){
-          const data = part.replace('data: ','').trim();
-          if(data === '[DONE]') continue;
-          try{
-            const parsed = JSON.parse(data);
-            const chunk = parsed.choices && parsed.choices[0] && parsed.choices[0].delta && parsed.choices[0].delta.content;
-            if(chunk){
-              broadcast({ type:'assistant_message', text: chunk });
-            }
-          }catch(e){}
+      
+      const lines = buffer.split('\n');
+      buffer = lines.pop(); // الاحتفاظ بالسطر الأخير غير المكتمل في المخزن المؤقت
+      
+      for(const line of lines){
+        if(line.trim().length === 0) continue;
+        try{
+          const parsed = JSON.parse(line);
+          // تحليل بنية استجابة Gemini
+          const chunk = parsed.candidates && parsed.candidates[0] && parsed.candidates[0].content && parsed.candidates[0].content.parts[0].text;
+          
+          if(chunk){
+            broadcast({ type:'assistant_message', text: chunk });
+          }
+        }catch(e){
+          // تجاهل أخطاء التحليل للخطوط الجزئية أو غير الصالحة
         }
       }
+      if(done) break;
     }
+    
     broadcast({ type:'assistant_message', text:'\n[STREAM COMPLETE]' });
     res.json({ status:'ok' });
   }catch(err){
@@ -84,6 +90,7 @@ app.post('/api/chat', async (req, res) => {
     res.json({ status:'error' });
   }
 });
+
 
 app.get('/api/events', (req, res) => {
   res.set({
@@ -104,3 +111,4 @@ function broadcast(payload){
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, ()=> console.log('Server listening on', PORT));
+                  
