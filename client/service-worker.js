@@ -1,10 +1,8 @@
-const CACHE_NAME = 'codeai-static-v1.268';
+const CACHE_NAME = 'codeai-static-v1.269';
 const ASSETS = [
 '/',
 '/index.html',
 '/manifest.json',
-'/styles.css',
-'/app.js',
 '/icons/icon-192x192.png', 
 '/icons/icon-512x512.png'];
 self.addEventListener('install', (e) => {
