@@ -1,4 +1,4 @@
-const CACHE_NAME = 'codeai-static-v1.274.4';
+const CACHE_NAME = 'codeai-static-v1.274.5';
 const ASSETS = [
 '/',
 '/styles.css',
@@ -6,7 +6,19 @@ const ASSETS = [
 '/index.html',
 '/manifest.json',
 '/icons/icon-192x192.png', 
-'/icons/icon-512x512.png'];
+'/icons/icon-512x512.png',
+'/assets/codezone-dark.png',
+'/assets/codezone-light.png',
+'/assets/copy-dark.png',
+'/assets/copy-light.png',
+'/assets/edit-dark.png',
+'/assets/edit-light.png',
+'/assets/export-dark.png',
+'/assets/export-light.png',
+'/assets/import-dark.png',
+'/assets/import-light.png',
+'/assets/logo.png',
+];
 // 1. مرحلة التثبيت (Install)
 self.addEventListener('install', (e) => {
   // تخزين الأصول الجديدة في الكاش الجديد
